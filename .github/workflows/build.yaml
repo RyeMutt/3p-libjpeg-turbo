@@ -11,7 +11,7 @@ jobs:
         os: [windows-2022, macos-13, ubuntu-22.04]
     runs-on: ${{ matrix.os }}
     steps:
-      - name: Setup nasm
+      - name: Setup Choco Packages
         if: ${{ runner.os == 'Windows' }}
         shell: pwsh
         run: |
@@ -34,3 +34,5 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/v')
     steps:
       - uses: secondlife/action-autobuild-release@v3
+        with:
+          public: true

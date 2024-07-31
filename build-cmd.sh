@@ -23,9 +23,13 @@ case "$AUTOBUILD_PLATFORM" in
         autobuild="$AUTOBUILD"
     ;;
 esac
+
 source_environment_tempfile="$stage/source_environment.sh"
 "$autobuild" source_environment > "$source_environment_tempfile"
 . "$source_environment_tempfile"
+
+# remove_cxxstd
+source "$(dirname "$AUTOBUILD_VARIABLES_FILE")/functions"
 
 top="$(pwd)"
 stage="$top/stage"
@@ -73,6 +77,8 @@ pushd "$LIBJPEG_TURBO_SOURCE_DIR"
         ;;
         darwin*)
             opts="${TARGET_OPTS:--arch $AUTOBUILD_CONFIGURE_ARCH $LL_BUILD_RELEASE}"
+            opts="$(set_target $opts)"
+            plainopts="$(remove_cxxstd $opts)"
 
             mkdir -p "build_release_x86"
             pushd "build_release_x86"
@@ -80,10 +86,9 @@ pushd "$LIBJPEG_TURBO_SOURCE_DIR"
                 CXXFLAGS="$opts" \
                 cmake .. -G Ninja -DWITH_JPEG8=ON -DWITH_SIMD=ON -DENABLE_SHARED=OFF -DENABLE_STATIC=ON -DREQUIRE_SIMD=ON \
                     -DCMAKE_BUILD_TYPE="Release" \
-                    -DCMAKE_C_FLAGS="$opts" \
+                    -DCMAKE_C_FLAGS="$plainopts" \
                     -DCMAKE_CXX_FLAGS="$opts" \
                     -DCMAKE_OSX_ARCHITECTURES:STRING=x86_64 \
-                    -DCMAKE_OSX_DEPLOYMENT_TARGET=${MACOSX_DEPLOYMENT_TARGET} \
                     -DCMAKE_MACOSX_RPATH=YES \
                     -DCMAKE_INSTALL_PREFIX="$stage/release_x86"
 
@@ -145,6 +150,7 @@ pushd "$LIBJPEG_TURBO_SOURCE_DIR"
 
             # Default target per --address-size
             opts="${TARGET_OPTS:--m$AUTOBUILD_ADDRSIZE $LL_BUILD_RELEASE}"
+            plainopts="$(remove_cxxstd $opts)"
 
             mkdir -p "$stage/lib/release"
 
@@ -153,7 +159,7 @@ pushd "$LIBJPEG_TURBO_SOURCE_DIR"
                 # Invoke cmake and use as official build
                 cmake -E env CFLAGS="$opts" CXXFLAGS="$opts" \
                 cmake .. -G Ninja -DCMAKE_BUILD_TYPE="Release" -DWITH_JPEG8=ON -DWITH_SIMD=ON -DREQUIRE_SIMD=ON -DENABLE_SHARED=OFF -DENABLE_STATIC=ON \
-                                  -DCMAKE_C_FLAGS="$opts" \
+                                  -DCMAKE_C_FLAGS="$plainopts" \
                                   -DCMAKE_CXX_FLAGS="$opts"
 
                 cmake --build . -j$AUTOBUILD_CPU_COUNT --config Release --clean-first
