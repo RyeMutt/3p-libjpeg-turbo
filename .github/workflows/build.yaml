@@ -1,0 +1,36 @@
+name: Build
+on:
+  pull_request:
+  push:
+    branches: [main]
+    tags: [v*]
+jobs:
+  build:
+    strategy:
+      matrix:
+        os: [windows-2022, macos-13, ubuntu-22.04]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Setup nasm
+        if: ${{ runner.os == 'Windows' }}
+        shell: pwsh
+        run: |
+          choco install nasm
+          echo "C:\Program Files\NASM" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+      - name: Setup Homebrew Packages
+        if: ${{ runner.os == 'macOS' }}
+        shell: bash
+        run: brew install ninja nasm
+      - name: Setup Apt Packages
+        if: ${{ runner.os == 'Linux' }}
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get -y install ninja-build nasm
+      - uses: secondlife/action-autobuild@v4
+  release:
+    needs: build
+    runs-on: [ubuntu-latest]
+    if: startsWith(github.ref, 'refs/tags/v')
+    steps:
+      - uses: secondlife/action-autobuild-release@v3
