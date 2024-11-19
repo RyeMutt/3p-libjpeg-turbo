@@ -74,65 +74,43 @@ pushd "$LIBJPEG_TURBO_SOURCE_DIR"
             cp -a turbojpeg.h "$stage_include"
         ;;
         darwin*)
-            # Setup deploy target
             export MACOSX_DEPLOYMENT_TARGET="$LL_BUILD_DARWIN_DEPLOY_TARGET"
 
-            # Setup build flags
-            opts="${TARGET_OPTS:--arch $AUTOBUILD_CONFIGURE_ARCH $LL_BUILD_RELEASE}"
-            plainopts="$(remove_cxxstd $opts)"
+            for arch in x86_64 arm64 ; do
+                ARCH_ARGS="-arch $arch"
+                opts="${TARGET_OPTS:-$ARCH_ARGS $LL_BUILD_RELEASE}"
+                cc_opts="$(remove_cxxstd $opts)"
+                ld_opts="$ARCH_ARGS"
 
-            mkdir -p "build_release_x86"
-            pushd "build_release_x86"
-                CFLAGS="$opts" \
-                CXXFLAGS="$opts" \
-                cmake .. -G Ninja -DWITH_JPEG8=ON -DWITH_SIMD=ON -DENABLE_SHARED=OFF -DENABLE_STATIC=ON -DREQUIRE_SIMD=ON \
-                    -DCMAKE_BUILD_TYPE="Release" \
-                    -DCMAKE_C_FLAGS="$plainopts" \
-                    -DCMAKE_CXX_FLAGS="$opts" \
-                    -DCMAKE_OSX_ARCHITECTURES:STRING=x86_64 \
-                    -DCMAKE_OSX_DEPLOYMENT_TARGET=${MACOSX_DEPLOYMENT_TARGET} \
-                    -DCMAKE_MACOSX_RPATH=YES \
-                    -DCMAKE_INSTALL_PREFIX="$stage/release_x86"
+                mkdir -p "build_$arch"
+                pushd "build_$arch"
+                    CFLAGS="$cc_opts" \
+                    CXXFLAGS="$opts" \
+                    LDFLAGS="$ld_opts" \
+                    cmake .. -G Ninja -DWITH_JPEG8=ON -DWITH_SIMD=ON -DENABLE_SHARED=OFF -DENABLE_STATIC=ON -DREQUIRE_SIMD=ON \
+                        -DCMAKE_BUILD_TYPE="Release" \
+                        -DCMAKE_C_FLAGS="$cc_opts" \
+                        -DCMAKE_CXX_FLAGS="$opts" \
+                        -DCMAKE_OSX_ARCHITECTURES:STRING="$arch" \
+                        -DCMAKE_OSX_DEPLOYMENT_TARGET=${MACOSX_DEPLOYMENT_TARGET} \
+                        -DCMAKE_MACOSX_RPATH=YES \
+                        -DCMAKE_INSTALL_PREFIX="$stage" \
+                        -DCMAKE_INSTALL_LIBDIR="$stage/lib/release/$arch" \
+                        -DCMAKE_INSTALL_INCLUDEDIR="$stage_include"
 
-                cmake --build . --config Release
-                cmake --install . --config Release
+                    cmake --build . --config Release --parallel $AUTOBUILD_CPU_COUNT
+                    cmake --install . --config Release
 
-                # conditionally run unit tests
-                if [ "${DISABLE_UNIT_TESTS:-0}" = "0" ]; then
-                    ctest -C Release
-                fi
-            popd
-
-            # mkdir -p "build_release_arm64"
-            # pushd "build_release_arm64"
-            #     CFLAGS="$C_OPTS_ARM64" \
-            #     CXXFLAGS="$CXX_OPTS_ARM64" \
-            #     LDFLAGS="$LINK_OPTS_ARM64" \
-            #     cmake .. -G Ninja -DWITH_JPEG8=ON -DWITH_SIMD=ON -DENABLE_SHARED=OFF -DENABLE_STATIC=ON -DREQUIRE_SIMD=ON \
-            #         -DCMAKE_BUILD_TYPE="Release" \
-            #         -DCMAKE_C_FLAGS="$C_OPTS_ARM64" \
-            #         -DCMAKE_CXX_FLAGS="$CXX_OPTS_ARM64" \
-            #         -DCMAKE_OSX_ARCHITECTURES:STRING=arm64 \
-            #         -DCMAKE_OSX_DEPLOYMENT_TARGET=${MACOSX_DEPLOYMENT_TARGET} \
-            #         -DCMAKE_MACOSX_RPATH=YES \
-            #         -DCMAKE_INSTALL_PREFIX="$stage/release_arm64"
-
-            #     cmake --build . --config Release
-            #     cmake --install . --config Release
-
-            #     # conditionally run unit tests
-            #     # if [ "${DISABLE_UNIT_TESTS:-0}" = "0" ]; then
-            #     #     ctest -C Release
-            #     # fi
-            # popd
+                    # conditionally run unit tests
+                    if [ "${DISABLE_UNIT_TESTS:-0}" = "0" ]; then
+                        ctest -C Release --parallel $AUTOBUILD_CPU_COUNT
+                    fi
+                popd
+            done
 
             # create fat libraries
-            # lipo -create ${stage}/release_x86/lib/libjpeg.a ${stage}/release_arm64/lib/libjpeg.a -output ${stage}/lib/release/libjpeg.a
-            # lipo -create ${stage}/release_x86/lib/libturbojpeg.a ${stage}/release_arm64/lib/libturbojpeg.a -output ${stage}/lib/release/libturbojpeg.a
-
-            # copy headers
-            cp -a ${stage}/release_x86/lib/libjpeg.a ${stage}/lib/release/libjpeg.a
-            mv $stage/release_x86/include/* $stage_include
+            lipo -create -output ${stage}/lib/release/libjpeg.a ${stage}/lib/release/x86_64/libjpeg.a ${stage}/lib/release/arm64/libjpeg.a
+            lipo -create -output ${stage}/lib/release/libturbojpeg.a ${stage}/lib/release/x86_64/libturbojpeg.a ${stage}/lib/release/arm64/libturbojpeg.a
         ;;
         linux*)
             # Default target per --address-size
